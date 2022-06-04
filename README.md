@@ -9,5 +9,5 @@ Adding The Optimism Subgraph Tutorial
 
 Teammates
 
-Bill ( @ZeroDayTrader )
+Bill ( @ZeroDayTrader)
 
