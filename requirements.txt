@@ -3,3 +3,4 @@ streamlit-autorefresh
 subgrounds
 black
 tabulate
+streamlit-echarts
