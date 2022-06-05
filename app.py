@@ -3,17 +3,11 @@ from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 from datetime import datetime
 from subgrounds.subgrounds import Subgrounds
+from metrics import MetricsDailySnapshots
+from streamlit_echarts import st_pyecharts
 
 # Refresh every 10 seconds
 REFRESH_INTERVAL_SEC = 10
-
-EXPLORERS = {
-    "mainnet": "etherscan.io",
-    "matic": "polygonscan.com",
-    "optimism": "optimistic.etherscan.io",
-    "arbitrum_one": "arbiscan.io",
-}
-
 
 sg = Subgrounds()
 subgraphs = {
@@ -33,6 +27,7 @@ subgraphs = {
 
 
 def fetch_data(subgraph, amount_in_usd_gte):
+    print(subgraph)
     latest_swaps = subgraph.Query.swaps(
         where=[subgraph.Swap.amountInUSD >= amount_in_usd_gte],
         orderBy=subgraph.Swap.timestamp,
@@ -65,7 +60,7 @@ def fetch_data(subgraph, amount_in_usd_gte):
         axis=1,
     )
     df["txn"] = df.apply(
-        lambda x: f"""[🔗](https://{EXPLORERS[x["protocol_network"].lower()]}/tx/{x["hash"]})""",
+        lambda x: f"""[🔗](https://polygonscan.com/tx/{x["hash"]})""",
         axis=1,
     )
     return df[["time", "dex", "network", "swap", "txn"]]
@@ -74,12 +69,28 @@ def fetch_data(subgraph, amount_in_usd_gte):
 st.set_page_config(page_icon="📈")
 ticker = st_autorefresh(interval=REFRESH_INTERVAL_SEC * 1000, key="ticker")
 st.title("📈 PolyGraph")
+st.header("Your one-stop shop to get insights into your Defi user data")
 
-networks = st.multiselect(
+networks = st.selectbox(
     "Select networks",
-    ["balancer-v2-polygon", "uniswap-v3-polygon", "sushi-swap-polygon", "quick-swap-polygon"],
-    ["balancer-v2-polygon", "uniswap-v3-polygon"],
+    ["balancer-v2-polygon", "uniswap-v3-polygon", "sushi-swap-polygon", "quick-swap-polygon"]
 )
+
+MetricsSnapshot = MetricsDailySnapshots(subgraphs.get(networks), sg, initial_timestamp=1601322741)
+
+with st.container():
+    st_pyecharts(
+        chart=MetricsSnapshot.transactions_count_chart(),
+        height="450px",
+        key="TransactionChart",
+    )
+
+with st.container():
+    st_pyecharts(
+        chart=MetricsSnapshot.active_users_chart(),
+        height="450px",
+        key="ActiveUsersChart",
+    )
 
 amount_in_usd_gte = st.select_slider(
     "Only display swaps with amount >=",
@@ -89,9 +100,7 @@ amount_in_usd_gte = st.select_slider(
 )
 
 data_loading = st.text(f"[Every {REFRESH_INTERVAL_SEC} seconds] Loading data...")
-df = pd.concat(
-    map(lambda x: fetch_data(subgraphs[x], amount_in_usd_gte), networks), axis=0
-)
+df = fetch_data(subgraphs[networks], amount_in_usd_gte)
 df = df.sort_values(by=["time"], ascending=False)
 data_loading.text(f"[Every {REFRESH_INTERVAL_SEC} seconds] Loading data... done!")
 st.markdown(df.to_markdown())
